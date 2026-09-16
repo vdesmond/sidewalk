@@ -26,7 +26,10 @@ $ ./ns3 run "sidewalk-robots --help"
 
 #include "v2x-kpi.h"
 
+#include "ns3/external-mobility-model.h"
 #include "ns3/nr-sl-ue-mac-scheduler-earliest.h"
+#include "ns3/robot-gateway.h"
+#include "ns3/triggered-send-helper.h"
 #include "ns3/sensing-trace-sink.h"
 
 #include "ns3/antenna-module.h"
@@ -45,6 +48,7 @@ $ ./ns3 run "sidewalk-robots --help"
 #include "ns3/stats-module.h"
 
 #include <iomanip>
+#include <memory>
 
 using namespace ns3;
 
@@ -175,7 +179,11 @@ NotifySlRlcPduRx(UeRlcRxOutputStats* stats,
  *        areaSize x areaSize square at constant speed (no pause).
  */
 NodeContainer
-InstallRobotMobility(uint16_t numRobots, double areaSize, double speed, double antennaHeight)
+InstallRobotMobility(uint16_t numRobots,
+                     double areaSize,
+                     double speed,
+                     double antennaHeight,
+                     bool external)
 {
     NodeContainer ueNodes;
     ueNodes.Create(numRobots);
@@ -193,6 +201,14 @@ InstallRobotMobility(uint16_t numRobots, double areaSize, double speed, double a
     spd << "ns3::ConstantRandomVariable[Constant=" << speed << "]";
     MobilityHelper mobility;
     mobility.SetPositionAllocator(posAlloc);
+    if (external)
+    {
+        // positions come from the co-simulation gateway (ROS 2); the allocator only
+        // provides a starting point until the first update arrives
+        mobility.SetMobilityModel("ns3::ExternalMobilityModel");
+        mobility.Install(ueNodes);
+        return ueNodes;
+    }
     mobility.SetMobilityModel("ns3::RandomWaypointMobilityModel",
                               "Speed", StringValue(spd.str()),
                               "Pause", StringValue("ns3::ConstantRandomVariable[Constant=0.0]"),
@@ -279,6 +295,7 @@ main(int argc, char* argv[])
     uint16_t pdb = 0;      // packet delay budget in ms; 0 = derive from T2
     bool dynamic = false;  // dynamic (per-packet) grants instead of SPS
     double slotFraction = 1.0; // <1: NrSlUeMacSchedulerEarliest restricted to the earliest fraction of candidate slots
+    uint16_t cosimPort = 0;    // >0: co-simulate with a ROS 2 bridge listening on this TCP port (localhost)
 
     // Traffic parameters (that we will use inside this script:)
     bool useIPv6 = false; // default IPV4
@@ -335,6 +352,7 @@ main(int argc, char* argv[])
     cmd.AddValue("pdb", "Packet delay budget in ms (0 = from T2)", pdb);
     cmd.AddValue("dynamic", "Use dynamic grants instead of semi-persistent scheduling", dynamic);
     cmd.AddValue("slotFraction", "Earliest fraction of candidate slots to select from (1 = stock scheduler)", slotFraction);
+    cmd.AddValue("cosimPort", "TCP port of the ROS 2 co-simulation bridge on localhost (0 = standalone run)", cosimPort);
     cmd.AddValue("useIPv6", "Use IPv6 instead of IPv4", useIPv6);
     cmd.AddValue("packetSizeBe",
                  "packet size in bytes to be used by best effort traffic",
@@ -466,7 +484,9 @@ main(int argc, char* argv[])
      *  2. Assign position to the UEs
      *  3. Install mobility model
      */
-    allSlUesContainer = InstallRobotMobility(numRobots, areaSize, speed, antennaHeight);
+    const bool cosim = cosimPort > 0;
+    allSlUesContainer =
+        InstallRobotMobility(numRobots, areaSize, speed, antennaHeight, cosim);
     if (scenario == "V2V_Urban")
     {
         // The V2V urban channel-condition model looks up MobilityBuildingInfo on each
@@ -864,8 +884,20 @@ main(int argc, char* argv[])
     double realAppStopTime = 0.0;
     double txAppDuration = 0.0;
 
+    // Co-simulation: the ROS 2 side decides when each robot emits a state message,
+    // so install a TriggeredSendApplication (fired by RobotGateway) instead of OnOff.
+    TriggeredSendHelper triggeredClient("ns3::UdpSocketFactory", remoteAddress);
+    triggeredClient.SetAttribute("PacketSize", UintegerValue(udpPacketSizeBe));
+
     for (uint32_t i = 0; i < txSlUes.GetN(); i++)
     {
+        if (cosim)
+        {
+            clientApps.Add(triggeredClient.Install(txSlUes.Get(i)));
+            clientApps.Get(i)->SetStartTime(slBearersActivationTime);
+            realAppStart = slBearersActivationTime.GetSeconds();
+            continue;
+        }
         clientApps.Add(sidelinkClient.Install(txSlUes.Get(i)));
         double jitter = startTimeSeconds->GetValue();
         Time appStart = slBearersActivationTime + Seconds(jitter);
@@ -938,7 +970,12 @@ main(int argc, char* argv[])
     UeToUePktTxRxOutputStats pktStats;
     pktStats.SetDb(&db, "pktTxRx");
 
-    if (!useIPv6)
+    if (cosim)
+    {
+        // no SeqTsSize header on triggered packets; deliveries are reported to ROS 2
+        // by RobotGateway (matched on packet UID) instead of the pktTxRx table
+    }
+    else if (!useIPv6)
     {
         // Set Tx traces
         for (uint32_t ac = 0; ac < clientApps.GetN(); ac++)
@@ -1026,7 +1063,21 @@ main(int argc, char* argv[])
 
     Time simStopTime = simTime + slBearersActivationTime + Seconds(realAppStart);
 
-    Simulator::Stop(simStopTime);
+    // Co-simulation: the ROS 2 bridge owns the clock (lock-step) and ends the run.
+    // The gateway must outlive Simulator::Run and be connected after apps exist.
+    std::unique_ptr<RobotGateway> gateway;
+    if (cosim)
+    {
+        gateway = std::make_unique<RobotGateway>(allSlUesContainer,
+                                                 slBearersActivationTime + MilliSeconds(100));
+        gateway->Attach();
+        std::cout << "Connecting to ROS 2 bridge on 127.0.0.1:" << cosimPort << std::endl;
+        gateway->Connect("127.0.0.1", cosimPort);
+    }
+    else
+    {
+        Simulator::Stop(simStopTime);
+    }
     Simulator::Run();
 
     /*
@@ -1039,7 +1090,10 @@ main(int argc, char* argv[])
     pscchPhyStats.EmptyCache();
     psschPhyStats.EmptyCache();
     ueRlcRxStats.EmptyCache();
-    v2xKpi.WriteKpis();
+    if (!cosim)
+    {
+        v2xKpi.WriteKpis(); // needs the pktTxRx table
+    }
 
     // GtkConfigStore config;
     //  config.ConfigureAttributes ();

@@ -16,7 +16,7 @@ This repo measures how well that works under robot-like traffic and tries to do 
 - [x] Sensing-algorithm instrumentation: one CSV row per TS 38.214 §8.1.4 execution via the `SensingAlgorithm` trace (`model/sensing-trace-sink`)
 - [x] Sweeps: robot density, message period, radio configuration at 20 ms, scheduler SlotFraction (`scripts/sweep.sh` presets)
 - [x] Own Mode 2 scheduler variant: `NrSlUeMacSchedulerEarliest` — latency-aware selection within the sensing-cleared candidate set (`model/`)
-- [ ] ROS 2 co-simulation: `rclcpp` robots ↔ ns3-cosim gateway ↔ 5G-LENA
+- [x] ROS 2 co-simulation: `rclcpp` robots ↔ ns3-cosim gateway ↔ 5G-LENA, lock-step in real time (`ros2/`, `model/robot-gateway`)
 
 ## Results so far
 
@@ -127,6 +127,49 @@ and it composes with the PDB. The p99 tail (~45 ms, ~1 % of packets) is unaffect
 by the PDB, and by `slProbResourceKeep`; it is spread uniformly over time and across all robots.
 Plausibly the SPS reselection gap, but not diagnosed here.
 
+### ROS 2 co-simulation
+
+The same scenario can be driven by ROS 2 instead of by ns-3's own mobility and traffic models
+(`--cosimPort=<port>`). It follows the ROS-NetSim / CORNET pattern via NIST's ns3-cosim gateway:
+ROS owns robots and time, ns-3 owns the radio, nothing is tunnelled.
+
+```
+ROS 2 (Humble, rclcpp)                                ns-3 / 5G-LENA
+robot_node ×N ──/robot_i/pose──▶ bridge_node ──TCP──▶ RobotGateway : ns3::Gateway
+   (random waypoint,                 │  every step_ms:        ExternalMobilityModel ← x y z
+    PoseStamped every period_ms)     │  "sec nsec [x y z send]×N"   TriggeredSendApplication ← send
+                                     │◀─ "[src:latency_us;…]×N" ── PacketSink Rx, matched to app Tx by packet UID
+robot_node j ◀──/robot_j/neighbors── PoseArray of the senders' poses as transmitted
+                 /sidewalk/latency_ms  one Float64 per delivery, + CSV
+```
+
+Time is lock-stepped: the bridge advances simulated time by `step_ms` per tick, ns-3 processes the
+step and replies, and the bridge paces ticks to the wall clock (`realtime:=true`), so `ros2 topic
+echo /robot_3/neighbors` shows neighbour states arriving with the sidelink's latency as they would on
+a real PC5 link. A `send` flag is raised whenever a robot published a new pose since the last tick,
+so emission timing is quantised to the bridge step (visible as stairs in the CDF below).
+
+Validation, 10 robots / 100 ms messages / tuned radio, 20 s, co-simulated vs standalone:
+PRR 0.971 vs 0.974, latency p50 9.1 vs 9.0 ms, p95 15.1 vs 16.6 ms (both PRRs count messages
+sent after the sidelink bearers are active; latencies are matched tx→rx pairs on both sides).
+The co-simulation also exposes something the standalone traffic model hides: p99 is 94 ms vs
+17 ms. ns-3's OnOff source is perfectly periodic and stays phase-locked to its SPS grant forever;
+the ROS robots' wall-clock timers jitter against the lock-stepped grant, so ~1 % of messages arrive
+just after their grant and wait a full reservation period. (Whether the smaller ~45 ms tail seen in
+the standalone 20 ms runs has a related cause is not established.)
+
+![cosim](results/cosim/latency_cdf.png)
+
+```bash
+docker exec slv2x bash /sidewalk/scripts/cosim.sh 10 100 20 --slMaxTxTransNumPssch=1 --slSubchannelSize=10 --numerologyBwpSl=1
+#                                        robots period_ms duration_s  [any sidewalk-robots args]
+.venv/bin/python analysis/cosim.py results/cosim/n10_p100.csv results/cosim/standalone_n10_p100-sidewalk-robots.db
+```
+
+`scripts/cosim.sh` launches `ros2 launch sidewalk_cosim cosim.launch.py` (N robots + bridge), then
+starts ns-3 against the bridge; the launch shuts everything down when the bridge finishes. All in
+the one dev container — ROS 2 Humble is installed there by `docker/ros2.sh`.
+
 ### Baseline: stock highway scenario
 
 `nr-v2x-west-to-east-highway`, 3 lanes, 200 B every 100 ms per vehicle, 5 s, 5 seeds:
@@ -145,24 +188,27 @@ This repo is an ns-3 **contrib module** (`build_lib` in `CMakeLists.txt`); `dock
 CMakeLists.txt      module definition (links against nr)
 model/              nr-sl-ue-mac-scheduler-earliest.{h,cc} — latency-aware Mode 2 selection (DoNrSlAllocation override)
                     sensing-trace-sink.{h,cc} — CSV sink for NrSlUeMac's SensingAlgorithm trace
-examples/           sidewalk-robots.cc — the robot scenario (derived from the 5G-LENA highway example)
-docker/             setup.sh (verified build steps), Dockerfile, dev.sh (persistent dev container)
+                    robot-gateway.{h,cc} — ns3-cosim Gateway: ROS 2 drives mobility + emission, deliveries flow back
+examples/           sidewalk-robots.cc — the robot scenario (derived from the 5G-LENA highway example); --cosimPort for co-sim
+ros2/sidewalk_cosim ROS 2 package: robot_node, bridge_node (TCP server of the gateway protocol), cosim.launch.py
+docker/             setup.sh (verified ns-3 build), ros2.sh (ROS 2 Humble + colcon), Dockerfile, dev.sh (persistent dev container)
 scripts/            sweep.sh <preset> — baseline | robots-density | robots-period | robots-tuning | robots-scheduler
-analysis/           kpi.py <results dir> — runs.csv, summary.csv, kpi.png, sensing.png
-results/            figures + CSVs are committed, .db/.log are not
+                    cosim.sh — end-to-end ROS 2 + ns-3 run
+analysis/           kpi.py <results dir> — runs.csv, summary.csv, kpi.png, sensing.png;  cosim.py — co-sim vs standalone CDF
+results/            figures + summary CSVs are committed; .db, raw per-run CSVs and logs are not
 ```
 
 ### `sidewalk-robots` parameters
 
 `--numRobots --areaSize --speed --antennaHeight --scenario={V2V_Urban,V2V_Highway,InH_OfficeOpen,UMi_StreetCanyon}
---msgPeriod --pdb --dynamic --reservationPeriod --slotFraction` plus every sidelink knob of the upstream example
+--msgPeriod --pdb --dynamic --reservationPeriod --slotFraction --cosimPort` plus every sidelink knob of the upstream example
 (`--enableSensing --slSensingWindow --slSelectionWindow --t1 --t2 --slThresPsschRsrp --slProbResourceKeep
 --slMaxTxTransNumPssch --slSubchannelSize --mcs --numerologyBwpSl --bandwidthBandSl ...`).
 
 ## Reproduce
 
 ```bash
-bash docker/dev.sh                                   # container `slv2x`, build on volume `slv2x-opt` (~40 min, -j4, 9 GB)
+bash docker/dev.sh                                   # container `slv2x`, ns-3 build on volume `slv2x-opt` (~40 min, -j4, 9 GB) + ROS 2 Humble
 docker exec slv2x bash /sidewalk/scripts/sweep.sh robots-density   # ~2 min on 4 cores
 docker exec slv2x bash /sidewalk/scripts/sweep.sh baseline         # ~10 min
 python3 -m venv .venv && .venv/bin/pip install matplotlib pandas

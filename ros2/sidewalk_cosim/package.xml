@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>sidewalk_cosim</name>
+  <version>0.1.0</version>
+  <description>ROS 2 side of the sidewalk co-simulation: robot nodes and the ns-3 (5G-LENA sidelink) bridge.</description>
+  <maintainer email="vignesh.desmond@gmail.com">Vignesh Mohan</maintainer>
+  <license>GPL-2.0-only</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <exec_depend>ros2launch</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

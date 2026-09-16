@@ -11,6 +11,7 @@ build_lib_example(
     ${libsidewalk}
     ${libnr}
     ${libbuildings}
+    ${libns3-cosim}
     ${libflow-monitor}
     ${libstats}
 )

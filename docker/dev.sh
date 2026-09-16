@@ -13,4 +13,7 @@ docker exec slv2x bash -c 'export DEBIAN_FRONTEND=noninteractive; apt-get update
   libc6-dev libeigen3-dev sqlite3 libsqlite3-dev libgsl-dev libxml2-dev > /dev/null'
 # first time only: clone + build into the volume
 docker exec slv2x test -x /opt/ns-3-dev/ns3 || docker exec slv2x bash /sidewalk/docker/setup.sh
+docker exec slv2x ln -sfn /sidewalk /opt/ns-3-dev/contrib/sidewalk
+# ROS 2 Humble (Ubuntu 22.04) for the co-simulation, plus the sidewalk_cosim workspace
+docker exec slv2x bash /sidewalk/docker/ros2.sh
 echo "ready: docker exec -it slv2x bash"

@@ -7,3 +7,4 @@ __pycache__/
 results/**/*.db-journal
 results/robots-smoke/
 results/**/*-sensing.csv
+results/cosim/n*.csv
