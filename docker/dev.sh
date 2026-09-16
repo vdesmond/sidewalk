@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# (Re)create the persistent dev container. Source+build live on the docker volume
-# `slv2x-opt` (/opt/ns-3-dev); this repo is bind-mounted at /sidewalk.
+# (Re)create the persistent dev container
 set -e
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 docker rm -f slv2x 2>/dev/null || true

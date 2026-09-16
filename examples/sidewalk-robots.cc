@@ -5,24 +5,15 @@
 //
 // SPDX-License-Identifier: GPL-2.0-only
 
-/**
- * \ingroup examples
- * \file sidewalk-robots.cc
- * \brief Cooperative robots exchanging periodic state messages over NR sidelink Mode 2.
- *
- * Derived from nr-v2x-west-to-east-highway.cc (5G-LENA). The highway lanes are
- * replaced by N robots moving in a square area (random waypoint), every robot
- * groupcasts a short state message every msgPeriod ms and receives everyone
- * else's. Everything else -- out-of-coverage sidelink, Mode 2 sensing-based
- * SPS, KPI collection into SQLite -- is the upstream machinery.
- *
- * In addition to the v2x-kpi tables, every run of the Mode 2 sensing algorithm
+/*
+ * The code implements cooperative robots exchanging periodic state messages over NR sidelink Mode 2
+ * and is derived from nr-v2x-west-to-east-highway.cc (5G-LENA).
+ * The highway lanes are replaced by N robots moving in a square area (random waypoint), with every robot
+ * groupcasting a short state message every msgPeriod ms and receiving everyone else's.
+ * Everything else is the from upstream. In addition to the v2x-kpi tables, every run of the Mode 2 sensing algorithm
  * is logged to <outputDir><simTag>-sensing.csv (see SensingTraceSink).
- *
- * \code{.unparsed}
 $ ./ns3 run "sidewalk-robots --help"
-    \endcode
- */
+     */
 
 #include "v2x-kpi.h"
 
@@ -59,88 +50,79 @@ NS_LOG_COMPONENT_DEFINE("SidewalkRobots");
  * the protocol stack.
  */
 
-/**
- * \brief Method to listen the trace SlPscchScheduling of NrUeMac, which gets
+/*
+ * Method to listen the trace SlPscchScheduling of NrUeMac, which gets
  *        triggered upon the transmission of SCI format 1-A from UE MAC.
- *
- * \param pscchStats Pointer to the UeMacPscchTxOutputStats class,
+ * pscchStats: Pointer to the UeMacPscchTxOutputStats class,
  *        which is responsible to write the trace source parameters to a database.
- * \param pscchStatsParams Parameters of the trace source.
+ * pscchStatsParams: Parameters of the trace source.
  */
-void
-NotifySlPscchScheduling(UeMacPscchTxOutputStats* pscchStats,
-                        const SlPscchUeMacStatParameters pscchStatsParams)
+void NotifySlPscchScheduling(UeMacPscchTxOutputStats *pscchStats,
+                             const SlPscchUeMacStatParameters pscchStatsParams)
 {
     pscchStats->Save(pscchStatsParams);
 }
 
-/**
- * \brief Method to listen the trace SlPsschScheduling of NrUeMac, which gets
+/*
+ * Method to listen the trace SlPsschScheduling of NrUeMac, which gets
  *        triggered upon the transmission of SCI format 2-A and data from UE MAC.
- *
- * \param psschStats Pointer to the UeMacPsschTxOutputStats class,
+ * psschStats: Pointer to the UeMacPsschTxOutputStats class,
  *        which is responsible to write the trace source parameters to a database.
- * \param psschStatsParams Parameters of the trace source.
+ * psschStatsParams: Parameters of the trace source.
  */
-void
-NotifySlPsschScheduling(UeMacPsschTxOutputStats* psschStats,
-                        const SlPsschUeMacStatParameters psschStatsParams)
+void NotifySlPsschScheduling(UeMacPsschTxOutputStats *psschStats,
+                             const SlPsschUeMacStatParameters psschStatsParams)
 {
     psschStats->Save(psschStatsParams);
 }
 
-/**
- * \brief Method to listen the trace RxPscchTraceUe of NrSpectrumPhy, which gets
+/*
+ * Method to listen the trace RxPscchTraceUe of NrSpectrumPhy, which gets
  *        triggered upon the reception of SCI format 1-A.
- *
- * \param pscchStats Pointer to the UePhyPscchRxOutputStats class,
+ * pscchStats: Pointer to the UePhyPscchRxOutputStats class,
  *        which is responsible to write the trace source parameters to a database.
- * \param pscchStatsParams Parameters of the trace source.
+ * pscchStatsParams: Parameters of the trace source.
  */
-void
-NotifySlPscchRx(UePhyPscchRxOutputStats* pscchStats,
-                const SlRxCtrlPacketTraceParams pscchStatsParams)
+void NotifySlPscchRx(UePhyPscchRxOutputStats *pscchStats,
+                     const SlRxCtrlPacketTraceParams pscchStatsParams)
 {
     pscchStats->Save(pscchStatsParams);
 }
 
-/**
- * \brief Method to listen the trace RxPsschTraceUe of NrSpectrumPhy, which gets
+/*
+ * Method to listen the trace RxPsschTraceUe of NrSpectrumPhy, which gets
  *        triggered upon the reception of SCI format 2-A and data.
- *
- * \param psschStats Pointer to the UePhyPsschRxOutputStats class,
+ * psschStats: Pointer to the UePhyPsschRxOutputStats class,
  *        which is responsible to write the trace source parameters to a database.
- * \param psschStatsParams Parameters of the trace source.
+ * psschStatsParams: Parameters of the trace source.
  */
-void
-NotifySlPsschRx(UePhyPsschRxOutputStats* psschStats,
-                const SlRxDataPacketTraceParams psschStatsParams)
+void NotifySlPsschRx(UePhyPsschRxOutputStats *psschStats,
+                     const SlRxDataPacketTraceParams psschStatsParams)
 {
     psschStats->Save(psschStatsParams);
 }
 
-/**
- * \brief Method to listen the application level traces of type TxWithAddresses
+/*
+ * Method to listen the application level traces of type TxWithAddresses
  *        and RxWithAddresses.
- * \param stats Pointer to the UeToUePktTxRxOutputStats class,
+ * stats: Pointer to the UeToUePktTxRxOutputStats class,
  *        which is responsible to write the trace source parameters to a database.
- * \param node The pointer to the TX or RX node
- * \param localAddrs The local IPV4 address of the node
- * \param txRx The string indicating the type of node, i.e., TX or RX
- * \param p The packet
- * \param srcAddrs The source address from the trace
- * \param dstAddrs The destination address from the trace
- * \param seqTsSizeHeader The SeqTsSizeHeader
+ * node: The pointer to the TX or RX node
+ * localAddrs: The local IPV4 address of the node
+ * txRx: The string indicating the type of node, i.e., TX or RX
+ * p: The packet
+ * srcAddrs: The source address from the trace
+ * dstAddrs: The destination address from the trace
+ * seqTsSizeHeader: The SeqTsSizeHeader
  */
-void
-UePacketTraceDb(UeToUePktTxRxOutputStats* stats,
-                Ptr<Node> node,
-                const Address& localAddrs,
-                std::string txRx,
-                Ptr<const Packet> p,
-                const Address& srcAddrs,
-                const Address& dstAddrs,
-                const SeqTsSizeHeader& seqTsSizeHeader)
+void UePacketTraceDb(UeToUePktTxRxOutputStats *stats,
+                     Ptr<Node> node,
+                     const Address &localAddrs,
+                     std::string txRx,
+                     Ptr<const Packet> p,
+                     const Address &srcAddrs,
+                     const Address &dstAddrs,
+                     const SeqTsSizeHeader &seqTsSizeHeader)
 {
     uint32_t nodeId = node->GetId();
     uint64_t imsi = node->GetDevice(0)->GetObject<NrUeNetDevice>()->GetImsi();
@@ -150,32 +132,31 @@ UePacketTraceDb(UeToUePktTxRxOutputStats* stats,
     stats->Save(txRx, localAddrs, nodeId, imsi, pktSize, srcAddrs, dstAddrs, seq);
 }
 
-/**
- * \brief Trace sink for RxRlcPduWithTxRnti trace of NrUeMac
- * \param stats Pointer to UeRlcRxOutputStats API responsible to write the
+/*
+ * Trace sink for RxRlcPduWithTxRnti trace of NrUeMac
+ * stats: Pointer to UeRlcRxOutputStats API responsible to write the
  *        information communicated by this trace into a database.
- * \param imsi The IMSI of the UE
- * \param rnti The RNTI of the UE
- * \param txRnti The RNTI of the TX UE
- * \param lcid The logical channel id
- * \param rxPduSize The received PDU size
- * \param delay The end-to-end, i.e., from TX RLC entity to RX
+ * imsi: The IMSI of the UE
+ * rnti: The RNTI of the UE
+ * txRnti: The RNTI of the TX UE
+ * lcid: The logical channel id
+ * rxPduSize: The received PDU size
+ * delay: The end-to-end, i.e., from TX RLC entity to RX
  *        RLC entity, delay in Seconds.
  */
-void
-NotifySlRlcPduRx(UeRlcRxOutputStats* stats,
-                 uint64_t imsi,
-                 uint16_t rnti,
-                 uint16_t txRnti,
-                 uint8_t lcid,
-                 uint32_t rxPduSize,
-                 double delay)
+void NotifySlRlcPduRx(UeRlcRxOutputStats *stats,
+                      uint64_t imsi,
+                      uint16_t rnti,
+                      uint16_t txRnti,
+                      uint8_t lcid,
+                      uint32_t rxPduSize,
+                      double delay)
 {
     stats->Save(imsi, rnti, txRnti, lcid, rxPduSize, delay);
 }
 
-/**
- * \brief Create numRobots nodes moving by random waypoint inside a
+/*
+ * Create numRobots nodes moving by random waypoint inside a
  *        areaSize x areaSize square at constant speed (no pause).
  */
 NodeContainer
@@ -217,13 +198,12 @@ InstallRobotMobility(uint16_t numRobots,
     return ueNodes;
 }
 
-/**
- * \brief Get sidelink bitmap from string
- * \param slBitMapString The sidelink bitmap string
- * \param slBitMapVector The vector passed to store the converted sidelink bitmap
+/*
+ * Get sidelink bitmap from string
+ * slBitMapString: The sidelink bitmap string
+ * slBitMapVector: The vector passed to store the converted sidelink bitmap
  */
-void
-GetSlBitmapFromString(std::string slBitMapString, std::vector<std::bitset<1>>& slBitMapVector)
+void GetSlBitmapFromString(std::string slBitMapString, std::vector<std::bitset<1>> &slBitMapVector)
 {
     static std::unordered_map<std::string, uint8_t> lookupTable = {
         {"0", 0},
@@ -239,7 +219,7 @@ GetSlBitmapFromString(std::string slBitMapString, std::vector<std::bitset<1>>& s
         extracted.push_back(token);
     }
 
-    for (const auto& v : extracted)
+    for (const auto &v : extracted)
     {
         if (lookupTable.find(v) == lookupTable.end())
         {
@@ -249,12 +229,11 @@ GetSlBitmapFromString(std::string slBitMapString, std::vector<std::bitset<1>>& s
     }
 }
 
-/**
- * \brief Save position of the UE as per its IP address
- * \param v2xKpi pointer to the V2xKpi API storing the IP of an UE and its position.
+/*
+ * Save position of the UE as per its IP address
+ * v2xKpi: pointer to the V2xKpi API storing the IP of an UE and its position.
  */
-void
-SavePositionPerIP(V2xKpi* v2xKpi)
+void SavePositionPerIP(V2xKpi *v2xKpi)
 {
     for (NodeList::Iterator it = NodeList::Begin(); it != NodeList::End(); ++it)
     {
@@ -277,23 +256,22 @@ SavePositionPerIP(V2xKpi* v2xKpi)
     }
 }
 
-int
-main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     /*
      * Variables that represent the parameters we will accept as input by the
      * command line. Each of them is initialized with a default value.
      */
     uint16_t numRobots = 10;
-    double areaSize = 50;        // meters, square side
-    double speed = 1.5;          // meters per second
-    double antennaHeight = 0.5;  // meters
+    double areaSize = 50;               // meters, square side
+    double speed = 1.5;                 // meters per second
+    double antennaHeight = 0.5;         // meters
     std::string scenario = "V2V_Urban"; // channel scenario, see BandwidthPartInfo::Scenario
-    uint16_t msgPeriod = 100;    // ms between state messages per robot
+    uint16_t msgPeriod = 100;           // ms between state messages per robot
     bool logging = false;
     bool harqEnabled = true;
-    uint16_t pdb = 0;      // packet delay budget in ms; 0 = derive from T2
-    bool dynamic = false;  // dynamic (per-packet) grants instead of SPS
+    uint16_t pdb = 0;          // packet delay budget in ms; 0 = derive from T2
+    bool dynamic = false;      // dynamic (per-packet) grants instead of SPS
     double slotFraction = 1.0; // <1: NrSlUeMacSchedulerEarliest restricted to the earliest fraction of candidate slots
     uint16_t cosimPort = 0;    // >0: co-simulate with a ROS 2 bridge listening on this TCP port (localhost)
 
@@ -449,9 +427,7 @@ main(int argc, char* argv[])
      * If the logging variable is set to true, enable the log of some components
      * through the code. The same effect can be obtained through the use
      * of the NS_LOG environment variable:
-     *
      * export NS_LOG="OnOffApplication=level_all|prefix_time|prefix_func|prefix_node:PacketSink=..."
-     *
      * Usually, the environment variable way is preferred, as it is more customizable,
      * and more expressive.
      */
@@ -561,7 +537,6 @@ main(int argc, char* argv[])
      * We are not using beamforming in SL, rather we are using
      * quasi-omnidirectional transmission and reception, which is the default
      * configuration of the beams.
-     *
      * Following attribute would be common for all the UEs
      */
     nrHelper->SetUeAntennaAttribute("NumRows", UintegerValue(1));
@@ -667,7 +642,6 @@ main(int argc, char* argv[])
      * Above pool factory is created to help the users of the simulator to create
      * a pool with valid default configuration. Please have a look at the
      * constructor of NrSlCommResourcePoolFactory class.
-     *
      * In the following, we show how one could change those default pool parameter
      * values as per the need.
      */
@@ -726,7 +700,7 @@ main(int argc, char* argv[])
     LteRrcSap::SlFreqConfigCommonNr slFreConfigCommonNr;
     // Array for BWPs. Here we will iterate over the BWPs, which
     // we want to use for SL.
-    for (const auto& it : bwpIdContainer)
+    for (const auto &it : bwpIdContainer)
     {
         // it is the BWP id
         slFreConfigCommonNr.slBwpList[it] = slBwpConfigCommonNr;
@@ -765,7 +739,7 @@ main(int argc, char* argv[])
     // Communicate the above pre-configuration to the NrSlHelper
     nrSlHelper->InstallNrSlPreConfiguration(allSlUesNetDeviceContainer, slPreConfigNr);
 
-    /****************************** End SL Configuration ***********************/
+    /**************************** End SL Configuration ***********************/
 
     /*
      * Fix the random streams
@@ -787,7 +761,6 @@ main(int argc, char* argv[])
     /*
      * Configure the IP stack, and activate NR Sidelink bearer (s) as per the
      * configured time.
-     *
      * This example supports IPV4 and IPV6
      */
 

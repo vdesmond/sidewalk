@@ -7,15 +7,13 @@
 namespace ns3
 {
 
-/**
- * \brief Latency-aware Mode 2 resource selection.
- *
+/*
+ * Latency-aware Mode 2 resource selection.
  * TS 38.321 §5.22.1.1 says the MAC picks uniformly at random among the
  * candidate resources that survived sensing (TS 38.214 §8.1.4). For periodic
  * traffic on a semi-persistent grant with RRI == message period, the slot
  * picked at (re)selection fixes the arrival-to-grant offset of every later
  * packet, so a uniform pick costs on average half the selection window.
- *
  * This scheduler keeps only the earliest \c SlotFraction of the candidate
  * slots (never fewer slots than blind retransmissions need) and hands that
  * list to NrSlUeMacSchedulerFixedMcs::DoNrSlAllocation, which still does the
@@ -35,7 +33,7 @@ class NrSlUeMacSchedulerEarliest : public NrSlUeMacSchedulerFixedMcs
                           const AllocationInfo& allocationInfo) override;
 
   private:
-    double m_slotFraction{0.25}; //!< fraction of earliest candidate slots kept
+    double m_slotFraction{0.25}; // fraction of earliest candidate slots kept
 };
 
 } // namespace ns3

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """Validate the ROS 2 co-simulation against a standalone run of the same configuration.
-
-Usage: analysis/cosim.py results/cosim/n10_p100.csv results/cosim/standalone_n10_p100-sidewalk-robots.db
-Plots the per-packet latency CDF of both and prints PRR / percentiles.
 """
 import sqlite3, sys, os
 import numpy as np, pandas as pd

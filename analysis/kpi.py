@@ -2,10 +2,6 @@
 """Aggregate one sweep directory (from scripts/sweep.sh) into runs.csv, summary.csv and figures.
 
 Usage: analysis/kpi.py results/<preset> [--pdb-ms 20] [--title "..."]
-
-Every run's files are named "<key=value>_<key=value>_..-<example>.db" (+ "-sensing.csv" for
-sidewalk-robots). 'scheme' (0 random / 1 sensing) and 'run' (seed) are reserved keys; the one
-remaining key is the x axis.
 """
 import argparse, glob, os, re, sqlite3
 import numpy as np, pandas as pd

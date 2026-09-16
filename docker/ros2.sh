@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Install ROS 2 Humble (ros-base) in the dev container and build ros2/sidewalk_cosim.
-# Idempotent; run by docker/dev.sh.
 set -eo pipefail
 export DEBIAN_FRONTEND=noninteractive
 if [ ! -f /opt/ros/humble/setup.bash ]; then
