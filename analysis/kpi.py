@@ -7,6 +7,7 @@ import argparse, glob, os, re, sqlite3
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.style.use(os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.mplstyle"))
 
 SCHEMES = {0: ("random", "o--"), 1: ("sensing", "s-")}
 
@@ -49,6 +50,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("dir"); ap.add_argument("--pdb-ms", type=float, default=20)
     ap.add_argument("--title", default=None)
+    ap.add_argument("--order", default=None, help="comma-separated order of categorical x values")
     a = ap.parse_args()
     rows = []
     for db in sorted(glob.glob(os.path.join(a.dir, "*.db"))):
@@ -74,6 +76,8 @@ def main():
     if a.pdb_ms < 20:
         panels[2] = ("lat_p50_ms", "median latency [ms]")
     cats = sorted(df[x].unique(), key=lambda v: (isinstance(v, str), v))
+    if a.order:
+        cats = [c for c in a.order.split(",") if c in cats] + [c for c in cats if c not in a.order.split(",")]
     categorical = any(isinstance(v, str) for v in cats)
     xpos = lambda idx: [cats.index(v) for v in idx] if categorical else idx
     # no connecting lines between unordered categories

@@ -3,7 +3,7 @@
 #   docker exec slv2x bash /sidewalk/scripts/sweep.sh <preset>
 set -euo pipefail
 cd /opt/ns-3-dev
-PRESET=${1:?usage: sweep.sh <robots-density|robots-period>}
+PRESET=${1:?usage: sweep.sh <robots-density|robots-period|robots-tuning|robots-scheduler|robots-pdb>}
 OUT=/sidewalk/results/$PRESET; mkdir -p "$OUT"
 RUNS=${RUNS:-"1 2 3 4 5"}; JOBS=${JOBS:-4}; SIM_TIME=${SIM_TIME:-5}
 ROBOTS=./build/contrib/sidewalk/examples/ns3.42-sidewalk-robots-optimized
@@ -18,6 +18,33 @@ jobs() {
       for p in 20 40 100; do for s in 0 1; do for r in $RUNS; do
         echo "period=${p}_scheme=${s}_run=$r|$ROBOTS --numRobots=20 --msgPeriod=$p --enableSensing=$s"
       done; done; done ;;
+    robots-tuning)   # 20 robots at 20 ms: radio knobs that bring the pool back under capacity
+      declare -A CFG=(
+        [default]=""
+        [retx1]="--slMaxTxTransNumPssch=1"
+        [retx2]="--slMaxTxTransNumPssch=2"
+        [retx2-sub10]="--slMaxTxTransNumPssch=2 --slSubchannelSize=10"
+        [retx1-sub10-mu1]="--slMaxTxTransNumPssch=1 --slSubchannelSize=10 --numerologyBwpSl=1"
+        [retx2-sub10-mu1]="--slMaxTxTransNumPssch=2 --slSubchannelSize=10 --numerologyBwpSl=1"
+      )
+      for c in default retx1 retx2 retx2-sub10 retx1-sub10-mu1 retx2-sub10-mu1; do for s in 0 1; do for r in $RUNS; do
+        echo "config=${c}_scheme=${s}_run=$r|$ROBOTS --numRobots=20 --msgPeriod=20 --enableSensing=$s ${CFG[$c]}"
+      done; done; done ;;
+    robots-scheduler) # tuned 20 ms config, NrSlUeMacSchedulerEarliest SlotFraction sweep (1.0 = stock scheduler)
+      for f in 1.0 0.5 0.25 0.1 0.0; do for s in 0 1; do for r in $RUNS; do
+        echo "fraction=${f}_scheme=${s}_run=$r|$ROBOTS --numRobots=20 --msgPeriod=20 --enableSensing=$s --slMaxTxTransNumPssch=1 --slSubchannelSize=10 --numerologyBwpSl=1 --slotFraction=$f"
+      done; done; done ;;
+    robots-pdb)      # tuned 20 ms config, sensing on: the standard's own latency lever (--pdb shrinks T2) vs SlotFraction
+      declare -A CFG=(
+        [stock]=""
+        [pdb10]="--pdb=10"
+        [pdb5]="--pdb=5"
+        [frac0.1]="--slotFraction=0.1"
+        [pdb5-frac0.1]="--pdb=5 --slotFraction=0.1"
+      )
+      for c in stock pdb10 pdb5 frac0.1 pdb5-frac0.1; do for r in $RUNS; do
+        echo "config=${c}_scheme=1_run=$r|$ROBOTS --numRobots=20 --msgPeriod=20 --enableSensing=1 --slMaxTxTransNumPssch=1 --slSubchannelSize=10 --numerologyBwpSl=1 ${CFG[$c]}"
+      done; done ;;
     *) echo "unknown preset $PRESET"; exit 1 ;;
   esac
 }

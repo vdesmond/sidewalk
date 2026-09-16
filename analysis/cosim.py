@@ -5,6 +5,7 @@ import sqlite3, sys, os
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.style.use(os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.mplstyle"))
 
 csv, db = sys.argv[1], sys.argv[2]
 co = pd.read_csv(csv)

@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.style.use(os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.mplstyle"))
 import matplotlib.animation as animation
 
 db_path = sys.argv[1]
@@ -63,16 +64,15 @@ for i in range(frames):
     positions[i] = curr_pos
 
 # Setup plotting
-fig, ax = plt.subplots(figsize=(6, 6), facecolor="#111111")
-ax.set_facecolor("#111111")
+fig, ax = plt.subplots(figsize=(6, 6))
 ax.set_xlim(0, area)
 ax.set_ylim(0, area)
 ax.set_xticks([])
 ax.set_yticks([])
-ax.set_title("5G-NR Sidelink Mode 2 Swarm", color="white", pad=15)
+ax.set_title("5G-NR sidelink Mode 2 swarm", pad=15)
 
 # Plot elements
-scatter = ax.scatter([], [], c="#00ffcc", s=50, zorder=3, edgecolors="#ffffff", linewidths=0.5)
+scatter = ax.scatter([], [], c="#25B0BC", s=50, zorder=3, edgecolors="#ffffff", linewidths=0.5)
 lines = []
 
 def init():
@@ -101,7 +101,7 @@ def update(frame):
         dst = msg['dst_node']
         line, = ax.plot([pos[src, 0], pos[dst, 0]], 
                         [pos[src, 1], pos[dst, 1]], 
-                        c="#ff00ff", alpha=0.4, linewidth=1.5, zorder=2)
+                        c="#e95378", alpha=0.5, linewidth=1.5, zorder=2)
         lines.append(line)
         
     return [scatter] + lines
