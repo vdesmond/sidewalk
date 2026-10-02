@@ -1,13 +1,13 @@
 # Ultra-Low Latency Sidelink for Cooperative Robotics
 
-This project is an end-to-end simulation of a robot swarm exchanging high-frequency state messages over **5G-NR Sidelink Mode 2 (PC5)**. 
+End-to-end simulation of a robot swarm exchanging periodic state messages over **5G-NR Sidelink Mode 2 (PC5)**.
 
 Instead of relying on a central base station (gNB), the robots use distributed sensing and semi-persistent scheduling (SPS) to autonomously select radio resources. The goal is to guarantee ultra-low latency and high reliability for cooperative robotics (e.g., collision avoidance, swarm formation) in shared spectrum.
 
-This repository features a hybrid co-simulation using the following tools:
+It is a co-simulation of:
 - **ns-3 / 5G-LENA** models the 5G-NR physical and MAC layers, including a custom latency-aware Mode 2 MAC scheduler (`nr-sl-ue-mac-scheduler-earliest`).
 - **ROS 2 (Humble)** drives the robot mobility (random waypoint) and application logic.
-- The two are bridged via TCP lock-step (`ns3-cosim`), meaning the ROS 2 network sees real, accurate radio latency on its topics.
+- The two run in TCP lock-step (`ns3-cosim`), so the ROS 2 topics see the simulated radio latency.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ robot_node ◀──/neighbors──────┘
            (received states)
 ```
 
-Here, the ROS 2 bridge advances simulated time by `step_ms` per tick, ns-3 processes the step, computes the complex radio propagation/interference, and replies with the successful packet deliveries.
+The ROS 2 bridge advances simulated time by `step_ms` per tick, ns-3 runs that step and replies with the deliveries.
 
 ## Results
 
@@ -42,7 +42,7 @@ I compare the two Mode 2 flavours that 5G-LENA ships: **random** selection, wher
 | 20     | 0.68 / 0.85          | 0.41 / 0.17    | 112 / 25 ms                  | 0.93                   |
 | 40     | 0.46 / 0.63          | 0.67 / 0.53    | 124 / 115 ms                 | 0.79                   |
 
-We can see two regimes! Up to 20 robots, sensing does its job: PRR stays above 0.85 and p95 latency stays around 20 ms, while random selection has already degraded to PRR 0.68 with a p95 of 112 ms. At 40 robots the pool is saturated for both schemes. More than half of the transmissions overlap and the p95 latency jumps to the 100 ms SPS period, which simply means packets are waiting for the next grant.
+There are two regimes. Up to 20 robots, sensing does its job: PRR stays above 0.85 and p95 latency stays around 20 ms, while random selection has already degraded to PRR 0.68 with a p95 of 112 ms. At 40 robots the pool is saturated for both schemes. More than half of the transmissions overlap and the p95 latency jumps to the 100 ms SPS period, which simply means packets are waiting for the next grant.
 
 The sensing trace (`model/sensing-trace-sink`, one CSV row per run of the selection algorithm) tells us what is going on inside:
 
@@ -99,7 +99,7 @@ TS 38.321 has the MAC pick *uniformly at random* among the candidates that survi
 | 0.1                 | 3.2 ms         | 6.0 ms  | 0.85        | 0.931 / 0.820        | 0.14                    |
 | 0.0 (earliest only) | 2.7 ms         | 5.5 ms  | 0.89        | 0.909 / 0.736        | 0.21                    |
 
-We see that the median latency scales linearly with the fraction, which is what the SPS phase argument predicts. What it costs depends entirely on sensing. With sensing on, PRR gives up 0.6 pp at 0.25 and 4 pp at 0.0, with no extra collisions. With random selection, every robot greedily piles onto the same early slots and collisions double. So latency-aware selection and sensing are complementary and not alternatives!
+We see that the median latency scales linearly with the fraction, which is what the SPS phase argument predicts. What it costs depends entirely on sensing. With sensing on, PRR gives up 0.6 pp at 0.25 and 4 pp at 0.0, with no extra collisions. With random selection, every robot greedily piles onto the same early slots and collisions double. So latency-aware selection and sensing are complementary, not alternatives.
 
 The `SlotFraction = 1.0` row reproduces the stock scheduler bit-for-bit (same random draws on the full candidate list) and matches the tuned row of the tuning sweep exactly (PRR 0.948 / 0.873), which serves as a regression check.
 
@@ -131,7 +131,7 @@ I validated it against a standalone run of the same configuration (10 robots, 10
 | standalone ns-3 (OnOff traffic) | 0.974 | 9.0 ms | 16.6 ms | 17 ms |
 | co-simulation (ROS 2 robots)    | 0.971 | 9.1 ms | 15.1 ms | 94 ms |
 
-Both PRRs only count messages sent after the sidelink bearers are active, and latencies are matched tx → rx pairs on both sides. The distributions agree up to p95.  p99 is interesting though! 
+Both PRRs only count messages sent after the sidelink bearers are active, and latencies are matched tx → rx pairs on both sides. The distributions agree up to p95; p99 does not.
 
 The likely explanation is that ns-3's OnOff source is perfectly periodic and stays phase-locked to its SPS grant forever, whereas the ROS robots' wall-clock timers jitter against the lock-stepped grant, so about 1 % of the messages arrive just after their grant and wait a full reservation period. The same effect should appear on real hardware, where application timers are not phase-locked to the radio.
 
@@ -160,13 +160,13 @@ This repo is structured as an ns-3 **contrib module**.
   - `sensing-trace-sink`: Hooks into the MAC layer to export 3GPP TS 38.214 §8.1.4 sensing metrics.
 - `examples/sidewalk-robots.cc`: The main ns-3 simulation script orchestrating the UE configuration, mobility, and traffic.
 - `ros2/sidewalk_cosim/`: The ROS 2 package containing the `robot_node` and `bridge_node`.
-- `docker/`: Container definitions to build ns-3 and ROS 2 Humble without host pollution.
+- `docker/`: Container definitions for ns-3 and ROS 2 Humble.
 - `scripts/`: Batch execution scripts for parameter sweeps (`sweep.sh <preset>`) and co-simulation runs (`cosim.sh`).
 - `analysis/`: Python scripts (pandas/matplotlib) to parse the SQLite/CSV traces and generate KPIs (PRR, latency CDFs). `style.mplstyle` is the plot theme.
 
 ## How to Run
 
-Everything runs inside a Docker dev container to avoid polluting your host with ns-3 and ROS 2 dependencies.
+Everything runs inside a Docker dev container.
 
 ```bash
 # build the persistent dev container (installs ns-3, 5G-LENA, and ROS 2)
@@ -184,12 +184,9 @@ bash /sidewalk/scripts/cosim.sh 10 100 20  # 10 robots, 100ms msgs, 20s duration
 
 ## Visualization
 
-You can generate a beautiful MP4/GIF animation of the robot swarm communicating directly from the SQLite packet traces! The script reconstructs the mobility and highlights successful 5G Sidelink message deliveries in real-time.
+`analysis/animate.py` draws the deliveries from a run's packet trace (first 5 s) as an MP4, or a GIF if ffmpeg is missing. Positions are not stored in the trace, so the robots follow a fresh random waypoint track with the scenario's area and speed; only the delivery lines come from the simulation.
 
 ```bash
-# Assuming you've already generated a results database:
 .venv/bin/python analysis/animate.py results/robots-density/nodes=10_scheme=1_run=1-sidewalk-robots.db
 ```
-*(This outputs an MP4 video showing the 50x50m area with nodes flashing on message reception).*
-
 ![swarm](results/cosim/swarm.gif)

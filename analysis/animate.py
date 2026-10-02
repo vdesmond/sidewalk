@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate an animation of the robot swarm communicating.
+"""Animate the deliveries in a run: one line per received message.
 
 Usage: analysis/animate.py results/<preset>/<run>.db [output.mp4]
 """
@@ -19,7 +19,6 @@ print(f"Loading data from {db_path}...")
 conn = sqlite3.connect(db_path)
 p = pd.read_sql_query("SELECT timeSec, txRx, srcIp, nodeId FROM pktTxRx WHERE txRx='rx'", conn)
 
-# Map IPs to sender node IDs
 p['src_node'] = p['srcIp'].apply(lambda ip: int(ip.split('.')[-1]) - 2)
 p['dst_node'] = p['nodeId']
 
@@ -27,7 +26,7 @@ num_robots = max(p['src_node'].max(), p['dst_node'].max()) + 1
 start_time = p['timeSec'].min()
 end_time = p['timeSec'].max()
 
-# Cap animation to 5 seconds to keep it concise and punchy
+# first 5 s only
 end_time = min(end_time, start_time + 5.0)
 
 print(f"Animating {num_robots} robots from {start_time:.1f}s to {end_time:.1f}s...")
@@ -36,34 +35,29 @@ fps = 30
 dt = 1.0 / fps
 frames = int((end_time - start_time) / dt)
 
-# Generate smooth random waypoint mobility for the visualizer
+# positions are not in the db: draw a fresh random waypoint track (same area/speed as the scenario)
 np.random.seed(42)
 area = 50.0
 speed = 1.5
 
 positions = np.zeros((frames, num_robots, 2))
-# Initialize random waypoints
 curr_pos = np.random.uniform(0, area, (num_robots, 2))
 dest_pos = np.random.uniform(0, area, (num_robots, 2))
 
 for i in range(frames):
     diff = dest_pos - curr_pos
     dist = np.linalg.norm(diff, axis=1)
-    
-    # Move towards destination
+
     move = speed * dt
     reached = dist < move
-    
-    # Update destinations for those that reached
+
     dest_pos[reached] = np.random.uniform(0, area, (np.sum(reached), 2))
-    
-    # Move others
+
     direction = diff / np.maximum(dist, 1e-6)[:, None]
     curr_pos[~reached] += direction[~reached] * move
-    
+
     positions[i] = curr_pos
 
-# Setup plotting
 fig, ax = plt.subplots(figsize=(6, 6))
 ax.set_xlim(0, area)
 ax.set_ylim(0, area)
@@ -71,7 +65,6 @@ ax.set_xticks([])
 ax.set_yticks([])
 ax.set_title("5G-NR sidelink Mode 2 swarm", pad=15)
 
-# Plot elements
 scatter = ax.scatter([], [], c="#25B0BC", s=50, zorder=3, edgecolors="#ffffff", linewidths=0.5)
 lines = []
 
@@ -82,31 +75,27 @@ def init():
 def update(frame):
     t_start = start_time + frame * dt
     t_end = t_start + dt
-    
-    # Clear old lines
+
     for line in lines:
         line.remove()
     lines.clear()
-    
-    # Get current positions
+
     pos = positions[frame]
     scatter.set_offsets(pos)
-    
-    # Find messages delivered in this frame
+
+    # one line per delivery in this frame
     msgs = p[(p['timeSec'] >= t_start) & (p['timeSec'] < t_end)]
-    
-    # Draw connections
+
     for _, msg in msgs.iterrows():
         src = msg['src_node']
         dst = msg['dst_node']
-        line, = ax.plot([pos[src, 0], pos[dst, 0]], 
-                        [pos[src, 1], pos[dst, 1]], 
+        line, = ax.plot([pos[src, 0], pos[dst, 0]],
+                        [pos[src, 1], pos[dst, 1]],
                         c="#e95378", alpha=0.5, linewidth=1.5, zorder=2)
         lines.append(line)
-        
+
     return [scatter] + lines
 
-print("Rendering animation (this may take a minute)...")
 ani = animation.FuncAnimation(fig, update, frames=frames, init_func=init, blit=True, interval=dt*1000)
 
 writer = animation.FFMpegWriter(fps=fps, bitrate=2000)

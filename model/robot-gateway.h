@@ -14,14 +14,14 @@ namespace ns3
 
 /*
  * ns3-cosim Gateway that lets a ROS 2 process drive robot mobility and
- *        message emission, and reports sidelink deliveries back.
+ *   message emission, and reports sidelink deliveries back.
  * Protocol (space-separated fields, "\r\n"-terminated, see ns3::Gateway):
  *   ROS -> ns-3, one message per time step:  sec nsec  [x y z send]*N
  *     x y z   position of robot i in metres (applied to its ExternalMobilityModel)
  *     send    1 = trigger one state-message transmission from robot i this step
  *   ns-3 -> ROS, the reply to each step:      [deliveries_i]*N
  *     deliveries_i  ";"-separated "src:latency_us" for every packet robot i
- *                   received since the previous step ("" if none)
+ *              received since the previous step ("" if none)
  * Deliveries are matched to their transmission by ns-3 packet UID (app Tx
  * trace -> PacketSink Rx trace), so no application header is required.
  */
@@ -31,7 +31,7 @@ class RobotGateway : public Gateway
     /*
      * robots:   the robot nodes; index in the container == robot id
      * txEnable: transmissions requested before this time are ignored
-     *                 (sidelink bearers are not active yet)
+     *            (sidelink bearers are not active yet)
      */
     RobotGateway(NodeContainer robots, Time txEnable);
 

@@ -6,14 +6,15 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 /*
- * The code implements cooperative robots exchanging periodic state messages over NR sidelink Mode 2
- * and is derived from nr-v2x-west-to-east-highway.cc (5G-LENA).
+ * Cooperative robots exchanging periodic state messages
+ * over NR sidelink Mode 2, derived from nr-v2x-west-to-east-highway.cc (5G-LENA).
  * The highway lanes are replaced by N robots moving in a square area (random waypoint), with every robot
  * groupcasting a short state message every msgPeriod ms and receiving everyone else's.
- * Everything else is the from upstream. In addition to the v2x-kpi tables, every run of the Mode 2 sensing algorithm
+ * Everything else is as upstream. In addition to the v2x-kpi tables, every run of the Mode 2 sensing algorithm
  * is logged to <outputDir><simTag>-sensing.csv (see SensingTraceSink).
-$ ./ns3 run "sidewalk-robots --help"
-     */
+ *
+ * Options: ./ns3 run "sidewalk-robots --help"
+ */
 
 #include "v2x-kpi.h"
 
@@ -52,9 +53,9 @@ NS_LOG_COMPONENT_DEFINE("SidewalkRobots");
 
 /*
  * Method to listen the trace SlPscchScheduling of NrUeMac, which gets
- *        triggered upon the transmission of SCI format 1-A from UE MAC.
+ *   triggered upon the transmission of SCI format 1-A from UE MAC.
  * pscchStats: Pointer to the UeMacPscchTxOutputStats class,
- *        which is responsible to write the trace source parameters to a database.
+ *   which is responsible to write the trace source parameters to a database.
  * pscchStatsParams: Parameters of the trace source.
  */
 void NotifySlPscchScheduling(UeMacPscchTxOutputStats *pscchStats,
@@ -65,9 +66,9 @@ void NotifySlPscchScheduling(UeMacPscchTxOutputStats *pscchStats,
 
 /*
  * Method to listen the trace SlPsschScheduling of NrUeMac, which gets
- *        triggered upon the transmission of SCI format 2-A and data from UE MAC.
+ *   triggered upon the transmission of SCI format 2-A and data from UE MAC.
  * psschStats: Pointer to the UeMacPsschTxOutputStats class,
- *        which is responsible to write the trace source parameters to a database.
+ *   which is responsible to write the trace source parameters to a database.
  * psschStatsParams: Parameters of the trace source.
  */
 void NotifySlPsschScheduling(UeMacPsschTxOutputStats *psschStats,
@@ -78,9 +79,9 @@ void NotifySlPsschScheduling(UeMacPsschTxOutputStats *psschStats,
 
 /*
  * Method to listen the trace RxPscchTraceUe of NrSpectrumPhy, which gets
- *        triggered upon the reception of SCI format 1-A.
+ *   triggered upon the reception of SCI format 1-A.
  * pscchStats: Pointer to the UePhyPscchRxOutputStats class,
- *        which is responsible to write the trace source parameters to a database.
+ *   which is responsible to write the trace source parameters to a database.
  * pscchStatsParams: Parameters of the trace source.
  */
 void NotifySlPscchRx(UePhyPscchRxOutputStats *pscchStats,
@@ -91,9 +92,9 @@ void NotifySlPscchRx(UePhyPscchRxOutputStats *pscchStats,
 
 /*
  * Method to listen the trace RxPsschTraceUe of NrSpectrumPhy, which gets
- *        triggered upon the reception of SCI format 2-A and data.
+ *   triggered upon the reception of SCI format 2-A and data.
  * psschStats: Pointer to the UePhyPsschRxOutputStats class,
- *        which is responsible to write the trace source parameters to a database.
+ *   which is responsible to write the trace source parameters to a database.
  * psschStatsParams: Parameters of the trace source.
  */
 void NotifySlPsschRx(UePhyPsschRxOutputStats *psschStats,
@@ -104,9 +105,9 @@ void NotifySlPsschRx(UePhyPsschRxOutputStats *psschStats,
 
 /*
  * Method to listen the application level traces of type TxWithAddresses
- *        and RxWithAddresses.
+ *   and RxWithAddresses.
  * stats: Pointer to the UeToUePktTxRxOutputStats class,
- *        which is responsible to write the trace source parameters to a database.
+ *   which is responsible to write the trace source parameters to a database.
  * node: The pointer to the TX or RX node
  * localAddrs: The local IPV4 address of the node
  * txRx: The string indicating the type of node, i.e., TX or RX
@@ -135,14 +136,14 @@ void UePacketTraceDb(UeToUePktTxRxOutputStats *stats,
 /*
  * Trace sink for RxRlcPduWithTxRnti trace of NrUeMac
  * stats: Pointer to UeRlcRxOutputStats API responsible to write the
- *        information communicated by this trace into a database.
+ *   information communicated by this trace into a database.
  * imsi: The IMSI of the UE
  * rnti: The RNTI of the UE
  * txRnti: The RNTI of the TX UE
  * lcid: The logical channel id
  * rxPduSize: The received PDU size
  * delay: The end-to-end, i.e., from TX RLC entity to RX
- *        RLC entity, delay in Seconds.
+ *   RLC entity, delay in Seconds.
  */
 void NotifySlRlcPduRx(UeRlcRxOutputStats *stats,
                       uint64_t imsi,
@@ -157,7 +158,7 @@ void NotifySlRlcPduRx(UeRlcRxOutputStats *stats,
 
 /*
  * Create numRobots nodes moving by random waypoint inside a
- *        areaSize x areaSize square at constant speed (no pause).
+ *   areaSize x areaSize square at constant speed (no pause).
  */
 NodeContainer
 InstallRobotMobility(uint16_t numRobots,
@@ -597,7 +598,7 @@ int main(int argc, char *argv[])
     /*
      * Set the SL error model and AMC
      * Error model type: ns3::NrEesmCcT1, ns3::NrEesmCcT2, ns3::NrEesmIrT1,
-     *                   ns3::NrEesmIrT2, ns3::NrLteMiErrorModel
+     *              ns3::NrEesmIrT2, ns3::NrLteMiErrorModel
      * AMC type: NrAmc::ShannonModel or NrAmc::ErrorModel
      */
     std::string errorModel = "ns3::NrEesmIrT1";

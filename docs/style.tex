@@ -1,0 +1,30 @@
+% Shared style for docs/*.tex diagrams: Horizon dark palette (as analysis/style.mplstyle).
+\usepackage[scaled]{helvet}
+\renewcommand\familydefault{\sfdefault}
+\usetikzlibrary{arrows.meta,backgrounds,fit,calc,shapes.geometric}
+\pgfdeclarelayer{ns}
+\pgfsetlayers{background,ns,main}
+
+\definecolor{bg}{HTML}{1C1E26}
+\definecolor{fg}{HTML}{FFFFFF}
+\definecolor{pink}{HTML}{E95378}
+\definecolor{teal}{HTML}{25B0BC}
+\definecolor{peach}{HTML}{FAB795}
+\definecolor{purple}{HTML}{B877DB}
+\definecolor{green}{HTML}{27D797}
+\definecolor{muted}{HTML}{9DA0C2}
+
+\tikzset{
+  every node/.style={font=\small, text=fg},
+  diagram/.style={background rectangle/.style={fill=bg}, show background rectangle, inner frame sep=14pt},
+  box/.style={draw, rounded corners=3pt, line width=0.9pt, align=center,
+              minimum height=0.9cm, minimum width=2.2cm, inner sep=4pt},
+  ros/.style={box, draw=purple, fill=purple!22!bg},
+  radio/.style={box, draw=teal, fill=teal!22!bg},
+  mine/.style={box, draw=pink, fill=pink!22!bg},
+  ns/.style={draw=muted, dashed, rounded corners=6pt, line width=0.7pt, inner sep=12pt},
+  nslabel/.style={font=\footnotesize\itshape, text=muted, anchor=north west},
+  data/.style={-{Latex[length=2.4mm]}, line width=1pt, draw=peach},
+  back/.style={-{Latex[length=2.4mm]}, line width=1pt, draw=green},
+  lbl/.style={font=\scriptsize, text=muted, fill=bg, inner sep=1.5pt},
+}
