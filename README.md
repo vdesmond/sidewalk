@@ -48,7 +48,7 @@ The sensing trace (`model/sensing-trace-sink`, one CSV row per run of the select
 
 ![sensing internals](results/robots-density/sensing.png)
 
-About 30 % of the candidate resources are always thrown away because the robot cannot sense while it transmits (half-duplex, step 5). This floor is set by the 5 blind retransmissions per packet and does not depend on density. The exclusion of *other* robots' reservations (step 6) is what grows, from 7 % at 5 robots to 55 % at 40. The RSRP back-off (i.e., raising the threshold by 3 dB until at least 20 % of the candidates survive) never fires below 20 robots. At 40 it fires on 58 % of the selections and needs about 9 steps, i.e. 26 dB, which is basically the algorithm giving up on exclusion.
+About 30 % of the candidate resources are always thrown away because the robot cannot sense while it transmits (half-duplex, step 5). This floor is set by the 5 transmissions per packet (`slMaxTxTransNumPssch = 5`, i.e. the initial transmission plus 4 blind retransmissions) and does not depend on density. The exclusion of *other* robots' reservations (step 6) is what grows, from 7 % at 5 robots to 55 % at 40. The RSRP back-off (i.e., raising the threshold by 3 dB until at least 20 % of the candidates survive) never fires below 20 robots. At 40 it fires on 58 % of the selections and needs about 9 steps, i.e. 26 dB, which is basically the algorithm giving up on exclusion.
 
 ### Message period, and tuning the radio for 20 ms
 
@@ -62,7 +62,7 @@ In `sweep.sh robots-period` for 20 robots, the period is varied down from 100 �
 | 40 ms  | 0.33 / 0.43          | 125 / 123 ms | 0.64                   | 84 %           |
 | 20 ms  | 0.07 / 0.18          | 153 / 151 ms | 0.57                   | 85 %           |
 
-At 20 ms the default radio configuration is simply over capacity. 20 robots × 5 blind retransmissions every 20 ms is about 100 slot-transmissions competing for roughly 60 resources. The back-off fires on 85 % of the selections and sensing cannot help anymore.
+At 20 ms the default radio configuration is simply over capacity. 20 robots × 5 transmissions every 20 ms is 100 transmissions competing for 36 resources (9 sidelink slots per 20-slot physical pool × 4 subchannels of 50 RBs). The back-off fires on 85 % of the selections and sensing cannot help anymore.
 
 So the question becomes which radio knobs bring the pool back under capacity. We have `sweep.sh robots-tuning` trying them at 20 robots / 20 ms:
 
@@ -70,22 +70,24 @@ So the question becomes which radio knobs bring the pool back under capacity. We
 
 | config                                     | PRR random / sensing | overlapping tx (sensing) | p95 latency (sensing) | within 20 ms (sensing) |
 | ------------------------------------------ | -------------------- | ------------------------ | --------------------- | ---------------------- |
-| default (5 retx, 50-RB subchannels, μ = 0) | 0.07 / 0.18          | 0.87                     | 151 ms                | 0.57                   |
-| 1 retransmission                           | 0.59 / 0.89          | 0.03                     | 19 ms                 | 0.98                   |
-| 2 retransmissions                          | 0.32 / 0.53          | 0.47                     | 108 ms                | 0.84                   |
-| 2 retx + 10-RB subchannels                 | 0.67 / 0.77          | 0.02                     | 21 ms                 | 0.95                   |
-| 2 retx + 10-RB subch + μ = 1               | 0.75 / 0.89          | 0.02                     | 15 ms                 | 0.98                   |
-| **1 retx + 10-RB subch + μ = 1**           | 0.87 / **0.95**      | **0.00**                 | **17 ms**             | **0.99**               |
+| default (5 tx, 50-RB subchannels, μ = 0)   | 0.07 / 0.18          | 0.87                     | 151 ms                | 0.57                   |
+| 1 tx (no retransmission)                   | 0.59 / 0.89          | 0.03                     | 19 ms                 | 0.98                   |
+| 2 tx                                       | 0.32 / 0.53          | 0.47                     | 108 ms                | 0.84                   |
+| 2 tx + 10-RB subchannels                   | 0.67 / 0.77          | 0.02                     | 21 ms                 | 0.95                   |
+| 2 tx + 10-RB subch + μ = 1                 | 0.75 / 0.89          | 0.02                     | 15 ms                 | 0.98                   |
+| **1 tx + 10-RB subch + μ = 1**             | 0.87 / **0.95**      | **0.00**                 | **17 ms**             | **0.99**               |
 
-We can see that the blind retransmissions are the dominant factor. They multiply the pool occupancy *and* the half-duplex blind spots, so going from 5 to 1 alone takes PRR from 0.18 to 0.89. Smaller subchannels (more, narrower resources, which is what a 200 byte message needs) and numerology 1 (0.5 ms slots, so twice the selection opportunities inside the same delay budget) buy the rest of the gains for us. One thing worth noting is that sensing matters *more* once the pool is right-sized, not less: with a single retransmission it turns 41 % overlapping transmissions into 3 %.
+We can see that the blind retransmissions are the dominant factor. They multiply the pool occupancy *and* the half-duplex blind spots, so going from 5 transmissions to 1 alone takes PRR from 0.18 to 0.89. (`slMaxTxTransNumPssch` counts every transmission of a TB, including the first, so the `retxN` preset names mean N transmissions.) Smaller subchannels (more, narrower resources, which is what a 200 byte message needs) and numerology 1 (0.5 ms slots, so twice the selection opportunities inside the same delay budget) buy the rest of the gains for us. One thing worth noting is that sensing matters *more* once the pool is right-sized, not less: with a single transmission per packet it turns 41 % overlapping transmissions into 3 %.
 
-We use the last row (1 retx, 10-RB subchannels, μ = 1) as the "tuned" configuration for everything below.
+What is left in the tuned configuration is half-duplex, not collisions: with zero overlap, a robot misses a message whenever it transmits in the same slot as the sender. With 18 sidelink slots per period that caps PRR at about 1 − 1/18 ≈ 0.94, which is where it sits.
+
+We use the last row (1 tx, 10-RB subchannels, μ = 1) as the "tuned" configuration for everything below.
 
 ### Latency-aware selection: `NrSlUeMacSchedulerEarliest`
 
 TS 38.321 has the MAC pick *uniformly at random* among the candidates that survived sensing. For periodic traffic on a semi-persistent grant whose period equals the message period, the slot chosen at (re)selection fixes the offset between packet arrival and grant for every subsequent packet. A uniform draw therefore costs on average half the selection window in latency, and it buys nothing in reliability, since sensing has already removed the reserved resources.
 
-`model/nr-sl-ue-mac-scheduler-earliest.{h,cc}` subclasses the stock `NrSlUeMacSchedulerFixedMcs` and overrides one method, `DoNrSlAllocation`. It keeps the earliest `SlotFraction` of the candidate *slots* (never fewer than the retransmissions need) and hands the rest back to the base class for the random draw, the PSFCH / minimum-time-gap constraints and the grant formatting. `SlotFraction = 1` is the stock scheduler. It is selected in the scenario with `--slotFraction`.
+`model/nr-sl-ue-mac-scheduler-earliest.{h,cc}` subclasses the stock `NrSlUeMacSchedulerFixedMcs` and overrides one method, `DoNrSlAllocation`. It keeps the earliest `SlotFraction` of the candidate *slots* (never fewer than the number of transmissions per TB, which must land in distinct slots) and hands the rest back to the base class for the random draw, the PSFCH / minimum-time-gap constraints and the grant formatting. `SlotFraction = 1` is the stock scheduler. It is selected in the scenario with `--slotFraction`.
 
 ![scheduler](results/robots-scheduler/kpi.png)
 
@@ -99,7 +101,7 @@ TS 38.321 has the MAC pick *uniformly at random* among the candidates that survi
 
 We see that the median latency scales linearly with the fraction, which is what the SPS phase argument predicts. What it costs depends entirely on sensing. With sensing on, PRR gives up 0.6 pp at 0.25 and 4 pp at 0.0, with no extra collisions. With random selection, every robot greedily piles onto the same early slots and collisions double. So latency-aware selection and sensing are complementary and not alternatives!
 
- The `SlotFraction = 1.0` row reproduces the stock scheduler bit-for-bit (same random draws on the full candidate list) and matches the tuned row of the tuning sweep exactly (PRR 0.948 / 0.873), which acts as a nice regression check.
+The `SlotFraction = 1.0` row reproduces the stock scheduler bit-for-bit (same random draws on the full candidate list) and matches the tuned row of the tuning sweep exactly (PRR 0.948 / 0.873), which serves as a regression check.
 
 3GPP already bounds latency through the packet delay budget: T2 is derived from the PDB (`--pdb` → `SidelinkInfo::m_pdb`), which shrinks the selection window itself.
 
@@ -114,11 +116,11 @@ We see that the median latency scales linearly with the fraction, which is what 
 
 So the PDB is the first thing to set, and it gets most of the way. What `SlotFraction` adds is that it keeps the *full* selection window for exclusion and only biases the draw. It is therefore not floored by T2min (5 ms here) and it does not shrink the candidate set that the 20 % back-off rule works on. It also composes with the PDB. The last column shows the difference by shrinking T2 to 5 ms which makes the robot's own transmissions eat 23 % of the (now small) window, while the fraction leaves that at 6 %.
 
-There is one thing we did not resolve. In every configuration above, 1–1.7 % of the packets land well outside the selection window, at 25–55 ms. The share of late packets barely changes with the fraction or the PDB, but the tail gets deeper the more we squeeze the selection: p99 goes from 30 ms at the stock scheduler to 56 ms at `SlotFraction = 0`. It is spread uniformly over time and across all robots. My guess (?) is the gap at SPS reselection (the old grant expires before the new one is usable, and biasing towards the earliest slots makes that gap bite harder), but we have not diagnosed it.
+There is one thing we did not resolve. In every configuration above, 1–1.7 % of the packets land well outside the selection window, at 25–55 ms. The share of late packets barely changes with the fraction or the PDB, but the tail gets deeper the more we squeeze the selection: p99 goes from 30 ms at the stock scheduler to 56 ms at `SlotFraction = 0`. It is spread uniformly over time and across all robots. The working hypothesis is SPS reselection: every run uses `slProbResourceKeep = 0`, so each reselection-counter expiry drops the grant, and 5G-LENA v2x-1.1 has no re-evaluation or pre-emption to catch a bad new selection. This has not been diagnosed yet.
 
 ### ROS 2 co-simulation
 
-The same scenario can be driven by ROS 2 instead of ns-3's own mobility and traffic models (`--cosimPort`). I follow the ROS-NetSim / CORNET pattern through NIST's ns3-cosim gateway. Here, ROS controls the robots and the clock, ns-3 owns the radio, and nothing is tunnelled. The bridge advances simulated time by `step_ms` per tick, ns-3 processes the step, and the reply carries the deliveries that happened in it, which the bridge republishes as `/robot_j/neighbors`. A `send` flag is raised whenever a robot published a new pose since the last tick, so emission timing is quantised to the bridge step (the stairs in the CDF below).
+The same scenario can be driven by ROS 2 instead of ns-3's own mobility and traffic models (`--cosimPort`). Like ROS-NetSim and CORNET, the robot and network simulators run in lock-step, but here it goes through NIST's ns3-cosim gateway. Unlike ROS-NetSim, which tunnels the real ROS traffic through the network simulator, nothing is tunnelled: ROS controls the robots and the clock, ns-3 owns the radio, and only poses, send flags and deliveries cross the gateway. The bridge advances simulated time by `step_ms` per tick, ns-3 processes the step, and the reply carries the deliveries that happened in it, which the bridge republishes as `/robot_j/neighbors`. A `send` flag is raised whenever a robot published a new pose since the last tick, so emission timing is quantised to the bridge step (the stairs in the CDF below).
 
 I validated it against a standalone run of the same configuration (10 robots, 100 ms, tuned radio, 20 s):
 
@@ -131,7 +133,7 @@ I validated it against a standalone run of the same configuration (10 robots, 10
 
 Both PRRs only count messages sent after the sidelink bearers are active, and latencies are matched tx → rx pairs on both sides. The distributions agree up to p95.  p99 is interesting though! 
 
-From some clever AI-aided research it seems, ns-3's OnOff source is perfectly periodic and stays phase-locked to its SPS grant forever, whereas the ROS robots' wall-clock timers jitter against the lock-stepped grant, so about 1 % of the messages arrive just after their grant and wait a full reservation period. I believe the same effect would exist on real hardware.
+The likely explanation is that ns-3's OnOff source is perfectly periodic and stays phase-locked to its SPS grant forever, whereas the ROS robots' wall-clock timers jitter against the lock-stepped grant, so about 1 % of the messages arrive just after their grant and wait a full reservation period. The same effect should appear on real hardware, where application timers are not phase-locked to the radio.
 
 ```bash
 docker exec slv2x bash /sidewalk/scripts/cosim.sh 10 100 20 --slMaxTxTransNumPssch=1 --slSubchannelSize=10 --numerologyBwpSl=1
